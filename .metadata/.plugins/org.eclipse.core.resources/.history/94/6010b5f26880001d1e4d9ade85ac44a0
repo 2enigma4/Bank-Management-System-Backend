@@ -1,0 +1,138 @@
+package com.cts.customer.controllertest;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.assertj.core.util.Arrays;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+
+import com.cts.customer.controller.CustomerController;
+import com.cts.customer.model.Customer;
+import com.cts.customer.model.ValidatedResponse;
+import com.cts.customer.repository.CustomerRepository;
+import com.cts.customer.restclients.AuthenticationClient;
+import com.cts.customer.service.CustomerServiceImpl;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+@WebMvcTest
+public class CustomerControllerTest {
+
+	@Autowired
+	private MockMvc mockMvc;
+	
+	@MockBean
+	private CustomerServiceImpl customerService;
+	
+	@MockBean
+	private AuthenticationClient authClient;
+	
+	@MockBean
+	private CustomerRepository customerRepo;
+	
+	LocalDate date = LocalDate.now();
+	
+	public static String asJsonString(final Object obj) {
+        try {
+        	ObjectMapper objectMapper = new ObjectMapper();
+        	objectMapper.registerModule(new JavaTimeModule());
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+	
+	@Test
+	public void testInsertCustomer() throws Exception {
+		Customer customer = (new Customer(1L,"Rajat verma","Street 344","Delhi","India","rajat@gmail.com","GHDSG56","9384739233",date,"male","Savings"));
+		when(customerService.saveCustomer(customer)).thenReturn(customer);
+		
+		RequestBuilder request = MockMvcRequestBuilders.post("/api/savecustomer")
+				.accept(MediaType.APPLICATION_JSON)
+				.content(asJsonString(customer))
+				.contentType(MediaType.APPLICATION_JSON);
+				
+		
+		MvcResult result = mockMvc.perform(request)
+								.andExpect(status().isCreated())
+								.andExpect(content().json("{\"custId\":1,\"name\":\"Rajat verma\",\"address\":\"Street 344\",\"state\":\"Delhi\",\"country\":\"India\",\"email\":\"rajat@gmail.com\",\"pan\":\"GHDSG56\",\"contact\":\"9384739233\",\"dob\":\"2022-12-20\",\"gender\":\"male\",\"accountType\":\"Savings\"}"))
+								.andReturn();
+	}
+	
+//	@Test
+//	public void testGetCustomer() throws Exception {
+//		Customer customer = (new Customer(1L,"Rajat verma","Street 344","Delhi","India","rajat@gmail.com","GHDSG56","9384739233",date,"male","Savings"));
+//		
+//		when(customerService.getCustomerById("token", 1L)).thenReturn(customer);
+//		
+//		RequestBuilder request = MockMvcRequestBuilders.get("/api/customerbyid/1")
+//		.accept(MediaType.APPLICATION_JSON)
+//		.header("Authorization", "Bearer token")
+//		.contentType(MediaType.APPLICATION_JSON);
+//		
+//		MvcResult result = mockMvc.perform(request)
+////				.andExpect(status().isOk())
+////				.andExpect(jsonPath("$.custId", is(1)))
+////				.andExpect(content().json("{\"custId\":1,\"name\":\"Rajat verma\",\"address\":\"Street 344\",\"state\":\"Delhi\",\"country\":\"India\",\"email\":\"rajat@gmail.com\",\"pan\":\"GHDSG56\",\"contact\":\"9384739233\",\"dob\":\"2022-12-19\",\"gender\":\"male\",\"accountType\":\"Savings\"}"))
+//				.andReturn();
+//		
+//		System.out.println(result.getResponse().getContentAsString());
+//	}
+	
+	@Test
+	public void testGetAllCustomer() throws Exception {
+		Customer customer1 = new Customer(1L,"Rajat verma","Street 344","Delhi","India","rajat@gmail.com","GHDSG56","9384739233",date,"male","Savings");
+		Customer customer2 = new Customer(2L,"Rohen Jain","Mayur Vihar Colony","Madhya Pradesh","India","rohan@gmail.com","GH67HJ2","9333896899",date,"male","Savings");
+		
+		List<Customer> custList = new ArrayList<>();
+		custList.add(customer1);
+		custList.add(customer2);
+		
+		ValidatedResponse tokenResponse = new ValidatedResponse("aayushi",true);
+		ResponseEntity<ValidatedResponse> response = new ResponseEntity<ValidatedResponse>(tokenResponse,HttpStatus.OK);
+
+		when(authClient.getValidity("Bearer Token")).thenReturn(response);
+		
+		when(customerRepo.findAll()).thenReturn(custList);
+		
+		when(customerService.getAllCustomers("Bearer token")).thenReturn(custList);
+		
+		RequestBuilder request = MockMvcRequestBuilders.get("/api/customers")
+				.accept(MediaType.APPLICATION_JSON)
+				.header("Authorization", "Bearer token")
+				.contentType(MediaType.APPLICATION_JSON);
+		
+		MvcResult result = mockMvc.perform(request)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$", Matchers.hasSize(2) ))
+				.andExpect(content().json("[{\"custId\":1,\"name\":\"Rajat verma\",\"address\":\"Street 344\",\"state\":\"Delhi\",\"country\":\"India\",\"email\":\"rajat@gmail.com\",\"pan\":\"GHDSG56\",\"contact\":\"9384739233\",\"dob\":\"2022-12-20\",\"gender\":\"male\",\"accountType\":\"Savings\"},{\"custId\":2,\"name\":\"Rohen Jain\",\"address\":\"Mayur Vihar Colony\",\"state\":\"Madhya Pradesh\",\"country\":\"India\",\"email\":\"rohan@gmail.com\",\"pan\":\"GH67HJ2\",\"contact\":\"9333896899\",\"dob\":\"2022-12-20\",\"gender\":\"male\",\"accountType\":\"Savings\"}]"))
+				.andReturn();
+		
+		System.out.println(result.getResponse().getContentAsString());
+	}
+	
+}
